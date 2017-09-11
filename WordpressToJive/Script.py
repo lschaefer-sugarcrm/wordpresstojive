@@ -3,6 +3,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 import json
 import config
+from datetime import datetime
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -28,11 +29,16 @@ def authenticateToJive():
         raise ValueError('Unable to get access token from response. ' + str(r.status_code) + ' ' + r.content)
     print 'Successfully authenticated and parsed access token.'
     
-def createBlogPost(title, author, content):
+def createBlogPost(title, author, pubDate, content):
     print 'Creating blog post'
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + access_token,
+        'X-Jive-Run-As': 'username ' + author #TODO: handle when usernames don't match
+        }
+    params = {
+        "published": pubDate.strftime('%Y-%m-%dT%H:%M:%S +%f'),
+        "updated": pubDate.strftime('%Y-%m-%dT%H:%M:%S +%f') #Setting the updated date to be the same as the published date since we don't get an updated date from Wordpress
         }
     requestBody = {
         "content": {
@@ -44,7 +50,7 @@ def createBlogPost(title, author, content):
         "parent": config.jiveUrl + "api/core/v3/places/" + config.jivePlaceId
         
         }
-    r = requests.post(config.jiveUrl + 'api/core/v3/contents', headers=headers, json=requestBody)
+    r = requests.post(config.jiveUrl + 'api/core/v3/contents', headers=headers, params=params, json=requestBody)
     if r.status_code == 201:
         print 'Successfully created blog post: ' + title
     else:
@@ -57,7 +63,8 @@ def processWordpressFile():
         title = item.find('title').text
         author = item.find('dc:creator', namespaces).text
         content = item.find('content:encoded', namespaces).text
-        createBlogPost(title, author, content)    
+        pubDate = datetime.strptime(item.find('pubDate').text, '%a, %d %b %Y %H:%M:%S +%f')
+        createBlogPost(title, author, pubDate, content)    
 
 authenticateToJive()
 processWordpressFile()
