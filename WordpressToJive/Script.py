@@ -4,6 +4,7 @@ from requests.auth import HTTPBasicAuth
 import json
 import config
 from datetime import datetime
+import re
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -73,6 +74,8 @@ def processBlogContent(content, authorNames):
     if content is None:
         return content
     
+    #If we weren't able to set the blog author, we'll add a sentence to the top of the post saying
+    # who originally wrote the post.
     if authorNames.get('jiveUsername') is config.username:
         firstName = authorNames.get('firstName')
         lastName = authorNames.get('lastName')
@@ -85,7 +88,20 @@ def processBlogContent(content, authorNames):
         if nameString is None and authorNames.get('authorId') is not None:
             nameString = authorNames.get('authorId')
         if nameString is not None:
-            content = "<p>Post originally written by " + nameString + ".</p>" + content
+            content = "<p><i>Post originally written by " + nameString + ".</i></p><p></p>" + content
+    
+    #Create new paragraphs 
+    #Remove tabs
+    content = re.sub(r'(\t)+', '', content)
+    #Remove new lines that come before tags
+    content = re.sub(r'(\n)+<', '<', content)
+    #Replace new lines with closing and opening paragraph tags.
+    content = re.sub(r'(\n)+', '</p><p></p><p>', content)
+    #Add empty space before headings
+    content = re.sub(r'(<h1)+', '<p></p><h1', content)
+    content = re.sub(r'(<h2)+', '<p></p><h2', content)
+    content = re.sub(r'(<h3)+', '<p></p><h3', content)
+    content = re.sub(r'(<h4)+', '<p></p><h4', content)
     
     return content 
     
