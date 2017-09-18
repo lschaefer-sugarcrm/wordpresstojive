@@ -103,6 +103,17 @@ def processBlogContent(content, authorNames):
     content = re.sub(r'(<h3)+', '<p></p><h3', content)
     content = re.sub(r'(<h4)+', '<p></p><h4', content)
     
+    #Embed YouTube links
+    #TODO: The RE works, but Jive is being super lame and stripping out the iframe code. Alex is checking to see if he 
+    #      can enable the embedded links
+#     content = re.sub(r'(http|https)(://youtu.be/)([a-zA-Z\d_-]+)', 
+#                      r'<p><iframe width="560" height="315" src="https://www.youtube.com/embed/\3" frameborder="0" allowfullscreen></iframe></p>', 
+#                      content)
+#     content = re.sub(r'\[youtube [http|https][://youtube.com/watch?v=]([a-zA-Z\d_-]+).*\]',
+#                  r'<p><iframe width="560" height="315" src="https://www.youtube.com/embed/\1" frameborder="0" allowfullscreen></iframe></p>', 
+#                  content)
+    
+    
     return content 
     
 def createBlogPost(title, author, pubDate, content):
@@ -131,7 +142,13 @@ def createBlogPost(title, author, pubDate, content):
         print 'Successfully created blog post: ' + title
     else:
         raise RuntimeError('An error occurred while creating blog post: ' + title + '. ' + str(r.status_code) + ' ' + r.content)
-    
+
+def isImageItem(guid):
+    guid = guid.lower()
+    if guid.endswith("png") or guid.endswith("jpg") or guid.endswith("jpeg") or guid.endswith("gif"):
+        return True
+    return False
+        
 def processWordpressFile():
     authenticateToJive()
     
@@ -140,6 +157,9 @@ def processWordpressFile():
     
     for item in channel.findall('item'):   
         try:
+            if isImageItem(item.find('guid').text):
+                continue
+            
             title = item.find('title').text
             
             authorNames = getAuthor(item.find('dc:creator', namespaces).text)
