@@ -5,6 +5,8 @@ import json
 import config
 from datetime import datetime
 import re
+import os
+import urllib
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -113,8 +115,62 @@ def processBlogContent(content, authorNames):
 #                  r'<p><iframe width="560" height="315" src="https://www.youtube.com/embed/\1" frameborder="0" allowfullscreen></iframe></p>', 
 #                  content)
     
+    #Handle images
+    #Split the content on the image tags
+    imgTagRegEx = r'(<img.*?src=\".*?\".*?/>)'
+    tokens = re.split(imgTagRegEx, content)
+
+    #TODO:  handle captions
+    #Iterate over image tags so we can upload them to Jive
+    for i, token in enumerate(tokens):
+        if re.compile(imgTagRegEx).match(token):
+            #Get the original image url
+            #TODO:  do we need to grab the width and height?
+            imageUrl = re.search(r'<img.*?src=\"(.*?)\".*?/>', token).group(1)
+            
+            #Download the image
+            imageName = imageUrl.split('/')[-1]
+            urllib.urlretrieve(imageUrl, imageName)
+            
+            #Upload the image to Jive and get the new url
+            newImageUrl = uploadImage(imageName, authorNames.get('jiveUsername'))
+            
+            #Delete the local copy of the image
+            os.remove(imageName)
+            
+            #Replace the original token with html for the new image
+            tokens[i] = "<img src='" + newImageUrl + "'/>"
+    
+    #join the tokens back together after updating images
+    content = ''.join(tokens)    
+    
+    
     
     return content 
+
+def uploadImage(imageName, jiveUsername):
+    print 'Uploading image'
+    headers = {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': 'Bearer ' + access_token,
+        'X-Jive-Run-As': 'username ' + jiveUsername,
+        'X-JCAPI-Token': config.X_JCAPI_Token
+        }
+    
+    files = {
+        #TODO: check if we need to explicitly set the image name and type
+        'file': (imageName,  
+                 open(imageName, 'rb'), 
+                 'image/jpg')
+        }
+    
+    r = requests.post(config.jiveUrl + 'api/core/v3/images', headers=headers, files=files)
+    if r.status_code == 201:
+        newImageUrl = json.loads(r.content).get('ref')
+        print 'Successfully uploaded image:' + imageName + '. New url: ' + newImageUrl
+        return newImageUrl
+    else:
+        raise RuntimeError('An error occurred while uploading image: ' + imageName + '. ' + str(r.status_code) + ' ' + r.content)  
     
 def createBlogPost(title, author, pubDate, content):
     print 'Creating blog post'
