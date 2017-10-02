@@ -116,11 +116,14 @@ def processBlogContent(content, authorNames):
 #                  content)
     
     #Handle images
+    
+    #Remove image captions
+    content = re.sub(r'\[caption.*?\](<img.*?/>).*?\[/caption\]', r'\1', content)
+    
     #Split the content on the image tags
     imgTagRegEx = r'(<img.*?src=\".*?\".*?/>)'
     tokens = re.split(imgTagRegEx, content)
 
-    #TODO:  handle captions
     #Iterate over image tags so we can upload them to Jive
     for i, token in enumerate(tokens):
         if re.compile(imgTagRegEx).match(token):
