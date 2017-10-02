@@ -125,9 +125,15 @@ def processBlogContent(content, authorNames):
     for i, token in enumerate(tokens):
         if re.compile(imgTagRegEx).match(token):
             #Get the original image url
-            #TODO:  do we need to grab the width and height?
             imageUrl = re.search(r'<img.*?src=\"(.*?)\".*?/>', token).group(1)
             
+            #Get the original image's width
+            widthSearchResults = re.search(r'width=\"(.*?)\"', token)
+            if widthSearchResults and widthSearchResults.group(1):
+                imageWidth = widthSearchResults.group(1)
+                if int(imageWidth) > 800:
+                    imageWidth = "800"
+                
             #Download the image
             imageName = imageUrl.split('/')[-1]
             urllib.urlretrieve(imageUrl, imageName)
@@ -139,7 +145,10 @@ def processBlogContent(content, authorNames):
             os.remove(imageName)
             
             #Replace the original token with html for the new image
-            tokens[i] = "<img src='" + newImageUrl + "'/>"
+            if imageWidth:
+                tokens[i] = "<br><img src='" + newImageUrl + "' width='" + imageWidth + "'/><br>"
+            else:
+                tokens[i] = "<br><img src='" + newImageUrl + "'/><br>"
     
     #join the tokens back together after updating images
     content = ''.join(tokens)    
