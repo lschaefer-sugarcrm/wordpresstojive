@@ -129,6 +129,7 @@ def processBlogContent(content, authorNames):
             
             #Get the original image's width
             widthSearchResults = re.search(r'width=\"(.*?)\"', token)
+            imageWidth = -1
             if widthSearchResults and widthSearchResults.group(1):
                 imageWidth = widthSearchResults.group(1)
                 if int(imageWidth) > 800:
@@ -139,13 +140,17 @@ def processBlogContent(content, authorNames):
             urllib.urlretrieve(imageUrl, imageName)
             
             #Upload the image to Jive and get the new url
-            newImageUrl = uploadImage(imageName, authorNames.get('jiveUsername'))
-            
-            #Delete the local copy of the image
-            os.remove(imageName)
+            try:
+                newImageUrl = uploadImage(imageName, authorNames.get('jiveUsername'))
+                os.remove(imageName)
+            except RuntimeWarning as e:
+                print e
+                os.remove(imageName)
+                tokens[i] = ""
+                continue
             
             #Replace the original token with html for the new image
-            if imageWidth:
+            if imageWidth != -1:
                 tokens[i] = "<br><img src='" + newImageUrl + "' width='" + imageWidth + "'/><br>"
             else:
                 tokens[i] = "<br><img src='" + newImageUrl + "'/><br>"
@@ -179,10 +184,10 @@ def uploadImage(imageName, jiveUsername):
         print 'Successfully uploaded image:' + imageName + '. New url: ' + newImageUrl
         return newImageUrl
     else:
-        raise RuntimeError('An error occurred while uploading image: ' + imageName + '. ' + str(r.status_code) + ' ' + r.content)  
+        raise RuntimeWarning('An error occurred while uploading image: ' + imageName + '. ' + str(r.status_code) + ' ' + r.content)  
     
 def createBlogPost(title, author, pubDate, content):
-    print 'Creating blog post'
+    print 'Creating blog post: ' + title
     headers = {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer ' + access_token,
@@ -226,6 +231,7 @@ def processWordpressFile():
                 continue
             
             title = item.find('title').text
+            print 'Found new blog post with title: ' + title
             
             authorNames = getAuthor(item.find('dc:creator', namespaces).text)
             
