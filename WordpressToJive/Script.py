@@ -113,8 +113,24 @@ def processBlogContent(content, authorNames):
     tokens = re.split(gistRegEx, content)
     #Iterate over gist links so we can convert them to code embedded on the page
     for i, token in enumerate(tokens):
+        #if the gist url is the text for a link, do nothing
+        try:
+            if tokens[i+1].split('</')[1][:2] == 'a>':
+                continue
+        except Exception as e:
+            pass
+        
+        #if the gist url is the src for a link, do nothing
+        try:
+            if tokens[i-1].endswith('href="'):
+                continue
+        except Exception as e:
+            pass
+        
+        #convert the gist url to a code block
         if re.compile(gistRegEx).match(token):
-            tokens[i] = getCodeFromGist(token) 
+            tokens[i] = getCodeFromGist(token)
+             
     #join the tokens back together after updating images
     content = ''.join(tokens)    
     
