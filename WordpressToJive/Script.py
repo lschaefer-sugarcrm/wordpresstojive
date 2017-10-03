@@ -240,7 +240,7 @@ def getCodeFromGist(gistUrl):
     
     return codeToReturn
     
-def createBlogPost(title, author, pubDate, content):
+def createBlogPost(title, author, pubDate, content, tags):
     print 'Creating blog post: ' + title
     headers = {
         'Content-Type': 'application/json',
@@ -258,7 +258,8 @@ def createBlogPost(title, author, pubDate, content):
         },
         "subject": title,
         "type": "post",
-        "parent": config.jiveUrl + "api/core/v3/places/" + config.jivePlaceId
+        "parent": config.jiveUrl + "api/core/v3/places/" + config.jivePlaceId,
+        "tags": tags
         
         }
     r = requests.post(config.jiveUrl + 'api/core/v3/contents', headers=headers, params=params, json=requestBody)
@@ -272,6 +273,14 @@ def isImageItem(guid):
     if guid.endswith("png") or guid.endswith("jpg") or guid.endswith("jpeg") or guid.endswith("gif"):
         return True
     return False
+
+# Get all of the categories associated with a wordpress item
+def getTags(item):
+    tags = []
+    categories = item.findall('category')
+    for category in categories:
+        tags.append(category.text)
+    return tags
         
 def processWordpressFile():
     authenticateToJive()
@@ -292,7 +301,10 @@ def processWordpressFile():
             content = processBlogContent(item.find('content:encoded', namespaces).text, authorNames)
             
             pubDate = datetime.strptime(item.find('pubDate').text, '%a, %d %b %Y %H:%M:%S +%f')
-            createBlogPost(title, authorNames.get('jiveUsername'), pubDate, content) 
+            
+            tags = getTags(item)
+            
+            createBlogPost(title, authorNames.get('jiveUsername'), pubDate, content, tags) 
         except Exception as e:
             print
             print ('Warning!  A blog post was not successfully created.')
