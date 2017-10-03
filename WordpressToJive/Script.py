@@ -91,7 +91,7 @@ def processBlogContent(content, authorNames):
             nameString = nameString + " " + lastName
         if nameString is None and authorNames.get('authorId') is not None:
             nameString = authorNames.get('authorId')
-        if nameString is not None:
+        if nameString is not None and nameString != 'sugarcrmdevelopers':
             content = "<p><i>Post originally written by " + nameString + ".</i></p><p></p>" + content
     
     #Create new paragraphs 
