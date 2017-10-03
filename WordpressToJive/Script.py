@@ -7,6 +7,8 @@ from datetime import datetime
 import re
 import os
 import urllib
+import urllib2
+from bs4 import BeautifulSoup
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -105,15 +107,17 @@ def processBlogContent(content, authorNames):
     content = re.sub(r'(<h3)+', '<p></p><h3', content)
     content = re.sub(r'(<h4)+', '<p></p><h4', content)
     
-    #Embed YouTube links
-    #TODO: The RE works, but Jive is being super lame and stripping out the iframe code. Alex is checking to see if he 
-    #      can enable the embedded links
-#     content = re.sub(r'(http|https)(://youtu.be/)([a-zA-Z\d_-]+)', 
-#                      r'<p><iframe width="560" height="315" src="https://www.youtube.com/embed/\3" frameborder="0" allowfullscreen></iframe></p>', 
-#                      content)
-#     content = re.sub(r'\[youtube [http|https][://youtube.com/watch?v=]([a-zA-Z\d_-]+).*\]',
-#                  r'<p><iframe width="560" height="315" src="https://www.youtube.com/embed/\1" frameborder="0" allowfullscreen></iframe></p>', 
-#                  content)
+    
+    #Hande Gist code snippets
+    gistRegEx = r'((?:http|https)://gist.github.com/[a-zA-Z\d_-]+/[a-zA-Z\d_-]+)'
+    tokens = re.split(gistRegEx, content)
+    #Iterate over gist links so we can convert them to code embedded on the page
+    for i, token in enumerate(tokens):
+        if re.compile(gistRegEx).match(token):
+            tokens[i] = getCodeFromGist(token) 
+    #join the tokens back together after updating images
+    content = ''.join(tokens)    
+    
     
     #Handle images
     
@@ -135,12 +139,20 @@ def processBlogContent(content, authorNames):
             imageWidth = -1
             if widthSearchResults and widthSearchResults.group(1):
                 imageWidth = widthSearchResults.group(1)
-                if int(imageWidth) > 800:
-                    imageWidth = "800"
+                try:
+                    if int(imageWidth) > 800:
+                        imageWidth = "800"
+                except Exception as e:
+                    print 'Warning! Unable to check image width'
                 
             #Download the image
             imageName = imageUrl.split('/')[-1]
-            urllib.urlretrieve(imageUrl, imageName)
+            try:
+                print urllib.urlretrieve(imageUrl, imageName)
+            except Exception as e:
+                print e
+                tokens[i] = ""
+                continue
             
             #Upload the image to Jive and get the new url
             try:
@@ -175,7 +187,6 @@ def uploadImage(imageName, jiveUsername):
         }
     
     files = {
-        #TODO: check if we need to explicitly set the image name and type
         'file': (imageName,  
                  open(imageName, 'rb'), 
                  'image/jpg')
@@ -188,6 +199,30 @@ def uploadImage(imageName, jiveUsername):
         return newImageUrl
     else:
         raise RuntimeWarning('An error occurred while uploading image: ' + imageName + '. ' + str(r.status_code) + ' ' + r.content)  
+
+def getCodeFromGist(gistUrl):
+    codeToReturn = ''
+    page = urllib2.urlopen(gistUrl)
+    soup = BeautifulSoup(page, 'html.parser')
+    codeSnippets = soup.find_all('div', attrs={'class', 'js-gist-file-update-container'})
+    for snippet in codeSnippets:
+        #find the header text
+        codeToReturn += '<span style="font-size: 18px;"><strong>'
+        codeToReturn += snippet.find('div', attrs={'class', 'file-header'}).find('strong').text.strip()
+        codeToReturn += '</strong></span>'
+        codeToReturn += '<br>'
+         
+        #find the code
+        codeToReturn += '<pre>'
+        codeTableRows = snippet.find('div', attrs={'class', 'blob-wrapper'}).find_all('tr')
+        for row in codeTableRows:
+            codeToReturn += row.find('td', attrs={'class', 'blob-code'}).renderContents()
+            codeToReturn += '<br>'
+         
+        codeToReturn += '</pre>'
+        codeToReturn += '<br>'
+    
+    return codeToReturn
     
 def createBlogPost(title, author, pubDate, content):
     print 'Creating blog post: ' + title
@@ -247,7 +282,6 @@ def processWordpressFile():
             print ('Warning!  A blog post was not successfully created.')
             print e
            
-
 
 processWordpressFile()
 
