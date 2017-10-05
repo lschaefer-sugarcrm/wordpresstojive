@@ -9,6 +9,7 @@ import os
 import urllib
 import urllib2
 from bs4 import BeautifulSoup
+from operator import itemgetter
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -265,8 +266,40 @@ def createBlogPost(title, author, pubDate, content, tags):
     r = requests.post(config.jiveUrl + 'api/core/v3/contents', headers=headers, params=params, json=requestBody)
     if r.status_code == 201:
         print 'Successfully created blog post: ' + title
+        return r.content
+        
     else:
         raise RuntimeError('An error occurred while creating blog post: ' + title + '. ' + str(r.status_code) + ' ' + r.content)
+ 
+#TODO:  Check on retaining formatting (new lines)
+def createComment(commentParentUrl, author, date, text):
+    print 'Adding comment to: ' + commentParentUrl
+    headers = {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + access_token,
+        'X-Jive-Run-As': 'username ' + config.username
+        }
+    params = {
+        "published": date.strftime('%Y-%m-%dT%H:%M:%S +%f'),
+        "updated": date.strftime('%Y-%m-%dT%H:%M:%S +%f') #Setting the updated date to be the same as the published date since we don't get an updated date from Wordpress
+        }
+    requestBody = {
+        "content": {
+            "type": "text/html",
+            "text": "<p><i>Comment originally made by " + author + ".</i></p><p></p>" + text
+        },
+        "type": "comment",
+        }
+    r = requests.post(commentParentUrl, headers=headers, params=params, json=requestBody)
+    if r.status_code == 201:
+        print 'Successfully created comment.'
+        return json.loads(r.content).get('resources').get('comments').get('ref')
+        
+    else:
+        raise RuntimeError('An error occurred while creating comment on: ' + commentParentUrl + '. ' + str(r.status_code) + ' ' + r.content)
+
+def getCommentUrl(responseContent):
+    return json.loads(responseContent).get('resources').get('comments').get('ref')
 
 def isImageItem(guid):
     guid = guid.lower()
@@ -281,6 +314,31 @@ def getTags(item):
     for category in categories:
         tags.append(category.text)
     return tags
+
+def createComments(blogPostCommentUrl, wordPressItem):
+    wordPressComments = wordPressItem.findall('wp:comment', namespaces)
+    wordPressCommentsList = []
+    for comment in wordPressComments:
+        newComment = {}
+        newComment["author"] = comment.find('wp:comment_author', namespaces).text
+        newComment["date"] = datetime.strptime(comment.find('wp:comment_date_gmt', namespaces).text + ' GMT', '%Y-%m-%d %H:%M:%S %Z')
+        newComment["text"] = comment.find('wp:comment_content', namespaces).text
+        newComment["id"] = int(comment.find('wp:comment_id', namespaces).text)
+        newComment["parent"] = int(comment.find('wp:comment_parent', namespaces).text)
+        wordPressCommentsList.append(newComment)
+    wordPressCommentsList = sorted(wordPressCommentsList, key=itemgetter('id'))
+    for i, comment in enumerate(wordPressCommentsList):
+        commentParentUrl = ""
+        if comment["parent"] == 0:
+            commentParentUrl = blogPostCommentUrl
+        else:
+            for com in wordPressCommentsList:
+                if(com["id"] == comment["parent"]):
+                    print com
+                    commentParentUrl = com["commentUrl"]
+                    break
+        wordPressCommentsList[i]["commentUrl"] = createComment(commentParentUrl, comment["author"], comment["date"], comment["text"])
+    
         
 def processWordpressFile():
     authenticateToJive()
@@ -304,7 +362,10 @@ def processWordpressFile():
             
             tags = getTags(item)
             
-            createBlogPost(title, authorNames.get('jiveUsername'), pubDate, content, tags) 
+            responseContent = createBlogPost(title, authorNames.get('jiveUsername'), pubDate, content, tags) 
+            
+            createComments(getCommentUrl(responseContent), item)
+
         except Exception as e:
             print
             print ('Warning!  A blog post was not successfully created.')
