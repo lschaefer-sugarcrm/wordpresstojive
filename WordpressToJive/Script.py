@@ -319,6 +319,9 @@ def createComments(blogPostCommentUrl, wordPressItem):
     wordPressComments = wordPressItem.findall('wp:comment', namespaces)
     wordPressCommentsList = []
     for comment in wordPressComments:
+        if comment.find('wp:comment_type', namespaces).text == "pingback":
+            continue
+        
         newComment = {}
         newComment["author"] = comment.find('wp:comment_author', namespaces).text
         newComment["date"] = datetime.strptime(comment.find('wp:comment_date_gmt', namespaces).text + ' GMT', '%Y-%m-%d %H:%M:%S %Z')
@@ -334,7 +337,6 @@ def createComments(blogPostCommentUrl, wordPressItem):
         else:
             for com in wordPressCommentsList:
                 if(com["id"] == comment["parent"]):
-                    print com
                     commentParentUrl = com["commentUrl"]
                     break
         wordPressCommentsList[i]["commentUrl"] = createComment(commentParentUrl, comment["author"], comment["date"], comment["text"])
