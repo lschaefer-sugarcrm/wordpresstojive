@@ -10,6 +10,7 @@ import urllib
 import urllib2
 from bs4 import BeautifulSoup
 from operator import itemgetter
+import time
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -96,18 +97,7 @@ def processBlogContent(content, authorNames):
             content = "<p><i>Post originally written by " + nameString + ".</i></p><p></p>" + content
     
     #Create new paragraphs 
-    #Remove tabs
-    content = re.sub(r'(\t)+', '', content)
-    #Remove new lines that come before tags
-    content = re.sub(r'(\n)+<', '<', content)
-    #Replace new lines with closing and opening paragraph tags.
-    content = re.sub(r'(\n)+', '</p><p></p><p>', content)
-    #Add empty space before headings
-    content = re.sub(r'(<h1)+', '<p></p><h1', content)
-    content = re.sub(r'(<h2)+', '<p></p><h2', content)
-    content = re.sub(r'(<h3)+', '<p></p><h3', content)
-    content = re.sub(r'(<h4)+', '<p></p><h4', content)
-    
+    content = formatParagraphs(content)
     
     #Hande Gist code snippets
     gistRegEx = r'((?:http|https)://gist.github.com/[a-zA-Z\d_-]+/[a-zA-Z\d_-]+)'
@@ -193,6 +183,21 @@ def processBlogContent(content, authorNames):
     
     
     return content 
+
+def formatParagraphs(textToFormat):
+    #Remove tabs
+    textToFormat = re.sub(r'(\t)+', '', textToFormat)
+    #Remove new lines that come before tags
+    textToFormat = re.sub(r'(\n)+<', '<', textToFormat)
+    #Replace new lines with closing and opening paragraph tags.
+    textToFormat = re.sub(r'(\n)+', '</p><p></p><p>', textToFormat)
+    #Add empty space before headings
+    textToFormat = re.sub(r'(<h1)+', '<p></p><h1', textToFormat)
+    textToFormat = re.sub(r'(<h2)+', '<p></p><h2', textToFormat)
+    textToFormat = re.sub(r'(<h3)+', '<p></p><h3', textToFormat)
+    textToFormat = re.sub(r'(<h4)+', '<p></p><h4', textToFormat)
+    
+    return textToFormat
 
 def uploadImage(imageName, jiveUsername):
     print 'Uploading image'
@@ -292,7 +297,11 @@ def createComment(commentParentUrl, author, date, text):
         }
     r = requests.post(commentParentUrl, headers=headers, params=params, json=requestBody)
     if r.status_code == 201:
-        print 'Successfully created comment.'
+        print 'Successfully created comment: ' + json.loads(r.content).get('resources').get('self').get('ref')
+        #Yes, it seems crazy to put a sleep in a script like this.  For some reason, Jive was listing the correct 
+        #number of comments under each blog post but wasn't displaying all of them.  Each time I ran the script,
+        #a different set of comments was hidden.  Adding the sleep fixed the problem.  Oh Jive...
+        time.sleep(2)
         return json.loads(r.content).get('resources').get('comments').get('ref')
         
     else:
@@ -325,7 +334,7 @@ def createComments(blogPostCommentUrl, wordPressItem):
         newComment = {}
         newComment["author"] = comment.find('wp:comment_author', namespaces).text
         newComment["date"] = datetime.strptime(comment.find('wp:comment_date_gmt', namespaces).text + ' GMT', '%Y-%m-%d %H:%M:%S %Z')
-        newComment["text"] = comment.find('wp:comment_content', namespaces).text
+        newComment["text"] = formatParagraphs(comment.find('wp:comment_content', namespaces).text)
         newComment["id"] = int(comment.find('wp:comment_id', namespaces).text)
         newComment["parent"] = int(comment.find('wp:comment_parent', namespaces).text)
         wordPressCommentsList.append(newComment)
