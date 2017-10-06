@@ -11,6 +11,7 @@ import urllib2
 from bs4 import BeautifulSoup
 from operator import itemgetter
 import time
+from config import jiveUrl, jivePlaceUrlPath
 
 namespaces = {
     'content': 'http://purl.org/rss/1.0/modules/content/',
@@ -98,6 +99,34 @@ def processBlogContent(content, authorNames):
     
     #Create new paragraphs 
     content = formatParagraphs(content)
+    
+    #Convert links to posts in the original Wordpress blog to links to new Jive posts
+    
+    #TODO:  not quite working yet. look at The School of REST - Part 2
+    
+    linksRegEx = r'(<a (?:.+?)href="' + config.wordpressBlogUrl + '(?:.+?)"(?:.+?)>(?:.+?)</a>)'
+    tokens = re.split(linksRegEx, content)
+    #Iterate over the WordPress links so we can convert them to Jive links
+    for i, token in enumerate(tokens):  
+        if re.compile(linksRegEx).match(token):
+            
+            groups = re.search(r'<a (?:.+?)href="' + config.wordpressBlogUrl + '(.+?)"(?:.+?)>(.+?)</a>', token)
+            originalUrl = groups.group(1)
+            originalLinkText = groups.group(2)
+            
+            page = urllib2.urlopen(config.wordpressBlogUrl + originalUrl)
+            soup = BeautifulSoup(page, 'html.parser')
+            title = soup.find('h1', attrs={'class', 'post-title'}).text.lower()
+            title = title.replace(" ", "-")
+            title = title.replace(u'\xa0', "-")
+            title = re.sub(r'[^-0-9a-zA-Z]+', '', title)
+            title = re.sub(r'-+', '-', title)
+            
+            tokens[i] = '<a href="' + jiveUrl + jivePlaceUrlPath + 'blog/' + originalUrl[0:11] + title + ">'" + originalLinkText + '</a>'
+             
+    #join the tokens back together after updating links
+    content = ''.join(tokens)    
+    
     
     #Hande Gist code snippets
     gistRegEx = r'((?:http|https)://gist.github.com/[a-zA-Z\d_-]+/[a-zA-Z\d_-]+)'
