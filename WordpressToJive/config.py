@@ -2,9 +2,12 @@ client_id = ''
 client_secret = ''
 
 username = ''
-password = '!'
+password = ''
+X_JCAPI_Token = ''
 
 jiveUrl = ''
 jivePlaceId = ''
+jivePlaceUrlPath = ''
 
-wordpressFileToParse = ''
+#Should end in a slash
+wordpressBlogUrl = ""

@@ -10,7 +10,6 @@ import urllib
 import urllib2
 from bs4 import BeautifulSoup
 from operator import itemgetter
-import time
 from config import jiveUrl, jivePlaceUrlPath
 
 namespaces = {
@@ -303,7 +302,6 @@ def createBlogPost(title, author, pubDate, content, tags):
     else:
         raise RuntimeError('An error occurred while creating blog post: ' + title + '. ' + str(r.status_code) + ' ' + r.content)
  
-#TODO:  Check on retaining formatting (new lines)
 def createComment(commentParentUrl, author, date, text):
     print 'Adding comment to: ' + commentParentUrl
     headers = {
