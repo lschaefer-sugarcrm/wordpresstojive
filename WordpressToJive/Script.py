@@ -102,15 +102,13 @@ def processBlogContent(content, authorNames):
     
     #Convert links to posts in the original Wordpress blog to links to new Jive posts
     
-    #TODO:  not quite working yet. look at The School of REST - Part 2
-    
-    linksRegEx = r'(<a (?:.+?)href="' + config.wordpressBlogUrl + '(?:.+?)"(?:.+?)>(?:.+?)</a>)'
+    linksRegEx = r'(<a (?:.*?)href="' + config.wordpressBlogUrl + '(?:.+?)"(?:.*?)>(?:.*?)</a>)'
     tokens = re.split(linksRegEx, content)
     #Iterate over the WordPress links so we can convert them to Jive links
     for i, token in enumerate(tokens):  
         if re.compile(linksRegEx).match(token):
             
-            groups = re.search(r'<a (?:.+?)href="' + config.wordpressBlogUrl + '(.+?)"(?:.+?)>(.+?)</a>', token)
+            groups = re.search(r'<a (?:.*?)href="' + config.wordpressBlogUrl + '(.+?)"(?:.*?)>(.*?)</a>', token)
             originalUrl = groups.group(1)
             originalLinkText = groups.group(2)
             
@@ -122,7 +120,7 @@ def processBlogContent(content, authorNames):
             title = re.sub(r'[^-0-9a-zA-Z]+', '', title)
             title = re.sub(r'-+', '-', title)
             
-            tokens[i] = '<a href="' + jiveUrl + jivePlaceUrlPath + 'blog/' + originalUrl[0:11] + title + ">'" + originalLinkText + '</a>'
+            tokens[i] = '<a href="' + jiveUrl + jivePlaceUrlPath + 'blog/' + originalUrl[0:11] + title + '">' + originalLinkText + '</a>'
              
     #join the tokens back together after updating links
     content = ''.join(tokens)    
@@ -410,7 +408,8 @@ def processWordpressFile():
             print
             print ('Warning!  A blog post was not successfully created.')
             print e
-           
+    
+    print 'Blog migration complete.  Woo hoo!'       
 
 processWordpressFile()
 
