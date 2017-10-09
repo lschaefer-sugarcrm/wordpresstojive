@@ -325,10 +325,6 @@ def createComment(commentParentUrl, author, date, text):
     r = requests.post(commentParentUrl, headers=headers, params=params, json=requestBody)
     if r.status_code == 201:
         print 'Successfully created comment: ' + json.loads(r.content).get('resources').get('self').get('ref')
-        #Yes, it seems crazy to put a sleep in a script like this.  For some reason, Jive was listing the correct 
-        #number of comments under each blog post but wasn't displaying all of them.  Each time I ran the script,
-        #a different set of comments was hidden.  Adding the sleep fixed the problem.  Oh Jive...
-        time.sleep(2)
         return json.loads(r.content).get('resources').get('comments').get('ref')
         
     else:
