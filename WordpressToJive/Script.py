@@ -86,14 +86,17 @@ def processBlogContent(content, authorNames):
         firstName = authorNames.get('firstName')
         lastName = authorNames.get('lastName')
         
-        nameString = None
+        nameString = ""
         if firstName is not None:
             nameString = firstName
         if lastName is not None:
-            nameString = nameString + " " + lastName
-        if nameString is None and authorNames.get('authorId') is not None:
+            if nameString == "":
+                nameString = lastName
+            else:
+                nameString = nameString + " " + lastName
+        if nameString == "" and authorNames.get('authorId') is not None:
             nameString = authorNames.get('authorId')
-        if nameString is not None and nameString != 'sugarcrmdevelopers':
+        if nameString != "" and nameString != 'sugarcrmdevelopers':
             content = "<p><i>Post originally written by " + nameString + ".</i></p><p></p>" + content
     
     #Create new paragraphs 
@@ -101,19 +104,22 @@ def processBlogContent(content, authorNames):
     
     #Convert links to posts in the original Wordpress blog to links to new Jive posts
     
-    linksRegEx = r'(<a (?:.*?)href="' + config.wordpressBlogUrl + '(?:.+?)"(?:.*?)>(?:.*?)</a>)'
+    linksRegEx = r'(<a [^>]*?href="https?://' + config.wordpressBlogUrl + '(?:.+?)"(?:.*?)>(?:.*?)</a>)'
     tokens = re.split(linksRegEx, content)
     #Iterate over the WordPress links so we can convert them to Jive links
     for i, token in enumerate(tokens):  
         if re.compile(linksRegEx).match(token):
             
-            groups = re.search(r'<a (?:.*?)href="' + config.wordpressBlogUrl + '(.+?)"(?:.*?)>(.*?)</a>', token)
+            groups = re.search(r'<a [^>]*?href="https?://' + config.wordpressBlogUrl + '(.+?)"(?:.*?)>(.*?)</a>', token)
             originalUrl = groups.group(1)
             originalLinkText = groups.group(2)
             
-            page = urllib2.urlopen(config.wordpressBlogUrl + originalUrl)
+            page = urllib2.urlopen("http://" + config.wordpressBlogUrl + originalUrl)
             soup = BeautifulSoup(page, 'html.parser')
-            title = soup.find('h1', attrs={'class', 'post-title'}).text.lower()
+            try:
+                title = soup.find('h1', attrs={'class', 'post-title'}).text.lower()
+            except Exception as e:
+                title = soup.find('h2', attrs={'class', 'post-title'}).text.lower()
             title = title.replace(" ", "-")
             title = title.replace(u'\xa0', "-")
             title = re.sub(r'[^-0-9a-zA-Z]+', '', title)
@@ -124,6 +130,10 @@ def processBlogContent(content, authorNames):
     #join the tokens back together after updating links
     content = ''.join(tokens)    
     
+    #Convert code blocks to pre blocks
+    content = content.replace('[code]', '<pre>')
+    content = content.replace('[code language="php"]', '<pre>')
+    content = content.replace('[/code]', '</pre>')
     
     #Hande Gist code snippets
     gistRegEx = r'((?:http|https)://gist.github.com/[a-zA-Z\d_-]+/[a-zA-Z\d_-]+)'
@@ -148,14 +158,30 @@ def processBlogContent(content, authorNames):
         if re.compile(gistRegEx).match(token):
             tokens[i] = getCodeFromGist(token)
              
-    #join the tokens back together after updating images
+    #join the tokens back together after updating gist code snippets
     content = ''.join(tokens)    
+    
+    
+    #Hande Gist tags
+    gistRegEx = r'(\[gist\].*?\[/gist\])'
+    tokens = re.split(gistRegEx, content)
+    #Iterate over gist tags so we can convert them to code embedded on the page
+    for i, token in enumerate(tokens):  
+        if re.compile(gistRegEx).match(token):
+            
+            groups = re.search(r'\[gist\](.*?)\[/gist\]', token)
+            gistlUrl = groups.group(1)
+            
+            tokens[i] = getCodeFromGist("http://gist.github.com/" + gistlUrl)
+             
+    #join the tokens back together after updating gist tags
+    content = ''.join(tokens)
     
     
     #Handle images
     
     #Remove image captions
-    content = re.sub(r'\[caption.*?\](<img.*?/>).*?\[/caption\]', r'\1', content)
+    content = re.sub(r'\[caption.*?\].*?(<img.*?/>).*?\[/caption\]', r'\1', content)
     
     #Split the content on the image tags
     imgTagRegEx = r'(<img.*?src=\".*?\".*?/>)'
@@ -331,18 +357,15 @@ def createComment(commentParentUrl, author, date, text):
 def getCommentUrl(responseContent):
     return json.loads(responseContent).get('resources').get('comments').get('ref')
 
-def isImageItem(guid):
-    guid = guid.lower()
-    if guid.endswith("png") or guid.endswith("jpg") or guid.endswith("jpeg") or guid.endswith("gif"):
-        return True
-    return False
-
 # Get all of the categories associated with a wordpress item
 def getTags(item):
     tags = []
     categories = item.findall('category')
     for category in categories:
-        tags.append(category.text)
+        tag = category.text
+        if tag is not None:
+            tag = tag.replace('/', ' & ')
+        tags.append(tag)
     return tags
 
 def createComments(blogPostCommentUrl, wordPressItem):
@@ -380,8 +403,14 @@ def processWordpressFile():
     
     for item in channel.findall('item'):   
         try:
-            if isImageItem(item.find('guid').text):
-                continue
+            
+            if (item.find('wp:post_type', namespaces).text != 'post'):
+                fileName = item.find('wp:attachment_url', namespaces).text.lower()
+                if fileName.endswith("png") or fileName.endswith("jpg") or fileName.endswith("jpeg") or fileName.endswith("gif"):
+                    continue
+                else:
+                    print 'Warning! The following item is not being converted: ' + item.find('title').text + '. (' + fileName + ')'
+                    continue
             
             title = item.find('title').text
             print 'Found new blog post with title: ' + title
@@ -400,7 +429,7 @@ def processWordpressFile():
 
         except Exception as e:
             print
-            print ('Warning!  A blog post was not successfully created.')
+            print ('Error!  A blog post was not successfully created.')
             print e
     
     print 'Blog migration complete.  Woo hoo!'       
