@@ -1,3 +1,5 @@
+# Copyright 2017 SugarCRM Inc.  Licensed by SugarCRM under the Apache 2.0 license.
+
 import xml.etree.ElementTree
 import requests
 from requests.auth import HTTPBasicAuth
@@ -12,10 +14,8 @@ from bs4 import BeautifulSoup
 from operator import itemgetter
 from config import jiveUrl, jivePlaceUrlPath
 
+# Add your namespaces here. For example, 'wp': 'http://wordpress.org/export/1.2/'
 namespaces = {
-    'content': 'http://purl.org/rss/1.0/modules/content/',
-    'dc': 'http://purl.org/dc/elements/1.1/',
-    'wp': 'http://wordpress.org/export/1.2/'
     }
 
 access_token = ""
@@ -96,7 +96,7 @@ def processBlogContent(content, authorNames):
                 nameString = nameString + " " + lastName
         if nameString == "" and authorNames.get('authorId') is not None:
             nameString = authorNames.get('authorId')
-        if nameString != "" and nameString != 'sugarcrmdevelopers':
+        if nameString != "" and nameString != config.username: 
             content = "<p><i>Post originally written by " + nameString + ".</i></p><p></p>" + content
     
     #Create new paragraphs 
@@ -133,6 +133,7 @@ def processBlogContent(content, authorNames):
     #Convert code blocks to pre blocks
     content = content.replace('[code]', '<pre>')
     content = content.replace('[code language="php"]', '<pre>')
+    content = content.replace('[code lang="php"]', '<pre>')
     content = content.replace('[/code]', '</pre>')
     
     #Hande Gist code snippets
